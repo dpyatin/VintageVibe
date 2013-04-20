@@ -193,8 +193,10 @@ class PhotoHandler(blobstore_handlers.BlobstoreDownloadHandler):
 
 class ShowLocation(webapp2.RequestHandler):
     def get(self):
-        
         user = users.get_current_user()
+        if not(user):
+            self.redirect(users.create_login_url(self.request.uri))
+            return
         allUsers = db.GqlQuery("SELECT * "
                             "FROM User")
         #need to display different pin for current user and same style for all the rest
@@ -219,7 +221,15 @@ class ShowLocation(webapp2.RequestHandler):
             <script>
             var map;
             var marker;
-            var currentUser=""" + cgi.escape(users.get_current_user().user_id()) + """;
+            var markers = new Array();
+            var currentUser=""" + user.user_id() + """;
+            var allUsers = new Array();
+            """)
+        for index,elem in enumerate(allUsers):
+            if elem.location is not None:
+                self.response.out.write("""allUsers["""+str(index)+"""]={"userid":\""""+elem.userId+"""\","location":\""""+elem.location+"""\"};""")
+            
+        self.response.out.write("""
             var initialize = navigator.geolocation.getCurrentPosition(function(position) {
             
                 var lng = position.coords.longitude;
@@ -232,7 +242,7 @@ class ShowLocation(webapp2.RequestHandler):
                 map = new google.maps.Map(document.getElementById('map-canvas'),mapOptions);
             
                 placeMarker(new google.maps.LatLng(position.coords.latitude, position.coords.longitude));
-            
+                            
                 function placeMarker(location) {
                     marker = new google.maps.Marker({
                         position: location,
@@ -240,11 +250,29 @@ class ShowLocation(webapp2.RequestHandler):
                         title: 'You'
                     });
                 }
+                            
+                for (var i = 0; i < allUsers.length; i++) {
+                    markers.push(new google.maps.Marker({
+                                    position: location,
+                                    map: map,
+                                    title: 'You'
+                                })
+                        );
+                }
             
                 google.maps.event.addListener(marker, 'click', function() {
                     map.setZoom(20);
                     map.setCenter(marker.getPosition());
+                    window.location.href="/items?userid="+currentUser
                 });
+                
+                for (var i = 0; i < markers.length; i++) {
+                    google.maps.event.addListener(markers[i], 'click', function() {
+                        map.setZoom(20);
+                        map.setCenter(markers[i].getPosition());
+                        window.location.href="/items?userid="+allUsers[i].userid;
+                    });
+                }
             });
             
             google.maps.event.addDomListener(window, 'load', initialize);
