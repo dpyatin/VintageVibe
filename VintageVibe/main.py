@@ -23,6 +23,7 @@ import webapp2
 import logging
 import uuid
 
+from google.appengine.api import search
 from google.appengine.ext import db
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import blobstore_handlers
@@ -78,7 +79,12 @@ class Items(webapp2.RequestHandler):
 
                               
     upload_url = blobstore.create_upload_url('/upload')
-    self.response.out.write('<html><body>')
+    self.response.out.write('<html>')
+    self.response.out.write("""<head><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="text/javascript" language="javascript" src="/javascript/jquery-2.0.0.min.js"></script>
+    <script type="text/javascript" language="javascript" src="/javascript/Main.js">
+    </script></head>""")
+    self.response.out.write('<body>')
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
@@ -112,7 +118,12 @@ class AddItem(blobstore_handlers.BlobstoreUploadHandler):
         return
   
     upload_url = blobstore.create_upload_url('/additem')
-    self.response.out.write('<html><body>')
+    self.response.out.write("""<head><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="text/javascript" language="javascript" src="/javascript/jquery-2.0.0.min.js"></script>
+    <script type="text/javascript" language="javascript" src="/javascript/Main.js">
+    </script></head>""")
+    
+    self.repsonse.out.write('<body>')
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
@@ -129,14 +140,14 @@ Item description:<br>
 </textarea>
 </p>
 <p>
-Please upload photos %s:<br>
+Add some pictures:<br>
 <input type="file" name="photos" size="40">
 </p>
 <div>
-<input type="submit" value="Send">
+<input type="submit" value="Upload Photos">
 </div>
 </form>
-</body></html>""" % (upload_url, user.user_id()))
+</body></html>""" % (upload_url))
 
   def post(self):
     user = getUser()
@@ -162,6 +173,33 @@ Please upload photos %s:<br>
         photo.put()
     self.redirect('/items')
     #self.redirect('/photo/%s' % blob_info.key())
+    
+class UpdateLocation(webapp2.RequestHandler):
+
+  def get(self):
+    logging.debug('Updating Location')
+
+    user = getUser()
+    if not(user):
+        logging.info('No user specified')
+    else:
+        logging.info('user is %s'%user.userId)
+    logging.info('longitude : %s'%self.request.get('long', default_value='long'))
+    logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
+  def post(self):
+    logging.debug('Updating Location')
+
+    user = getUser()
+    if not(user):
+        logging.info('No user specified')
+    else:
+        logging.info('user is %s'%user.userId)
+    user=getUser()
+    user.location="%f,%f"%(float(self.request.get('lat', default_value='0')), float(self.request.get('long', default_value='0')))
+    user.put()
+    logging.info('longitude : %s'%self.request.get('long', default_value='long'))
+    logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
+    
 
 
 class User(db.Model):
@@ -175,6 +213,8 @@ class Item(db.Model):
     uuid = db.StringProperty()
     userId = db.StringProperty()
     clothingType = db.StringProperty()
+    style = db.StringProperty()
+    color = db.StringProperty()
     description = db.StringProperty(multiline=True)
     price = db.FloatProperty()
     
@@ -337,5 +377,6 @@ class ShowLocation(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([('/', ShowLocation),
                                ('/additem', AddItem),
                                ('/photo/([^/]+)?', PhotoHandler),
-                               ('/items', Items)],
+                               ('/items', Items),
+                               ('/updatelocation', UpdateLocation)],
                               debug=True)
