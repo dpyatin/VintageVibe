@@ -156,9 +156,61 @@ class ServeHandler(blobstore_handlers.BlobstoreDownloadHandler):
     blob_info = blobstore.BlobInfo.get(resource)
     self.send_blob(blob_info)
 
+class ShowLocation(webapp2.RequestHandler):
+    def get(self):
+        self.response.out.write('<html><body>')
+        self.response.out.write("""<h1>VintageVibe</h1>""")
+        self.response.out.write("""<p id="demo">Click the button to get your position:</p>
+            <p id="latitude"></p>
+            <p id="longitude"></p>
+            <button onclick="getLocation()">Try It</button>
+            <div id="mapholder"></div>
+            <script>
+            var x=document.getElementById("demo");
+            function getLocation()
+            {
+            if (navigator.geolocation)
+            {
+            navigator.geolocation.getCurrentPosition(showPosition,showError);
+            }
+            else{x.innerHTML="Geolocation is not supported by this browser.";}
+            }
+            
+            function showPosition(position)
+            {
+            var latlon=position.coords.latitude+","+position.coords.longitude;
+            document.getElementById("latitude").innerHTML=position.coords.latitude;
+            document.getElementById("longitude").innerHTML=position.coords.longitude;
+            
+            var img_url="http://maps.googleapis.com/maps/api/staticmap?center="
+            +latlon+"&zoom=14&size=400x300&markers="+latlon+"&sensor=false";
+            document.getElementById("mapholder").innerHTML="<img src='"+img_url+"'>";
+            }
+            
+            function showError(error)
+            {
+            switch(error.code)
+            {
+            case error.PERMISSION_DENIED:
+            x.innerHTML="User denied the request for Geolocation."
+            break;
+            case error.POSITION_UNAVAILABLE:
+            x.innerHTML="Location information is unavailable."
+            break;
+            case error.TIMEOUT:
+            x.innerHTML="The request to get user location timed out."
+            break;
+            case error.UNKNOWN_ERROR:
+            x.innerHTML="An unknown error occurred."
+            break;
+            }
+            }
+            </script>""")
+        self.response.out.write('</body></html>')
     
 app = webapp2.WSGIApplication([('/', MainPage),
                                ('/additem', AddItem),
                                ('/upload', UploadHandler),
                                ('/serve/([^/]+)?', ServeHandler)],
+                               ('/showLocation', ShowLocation)],
                               debug=True)
