@@ -29,17 +29,28 @@ from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.api import users
 
 
-class Greeting(db.Model):
-  """Models an individual Guestbook entry with an author, content, and date."""
-  author = db.StringProperty()
-  content = db.StringProperty(multiline=True)
-  date = db.DateTimeProperty(auto_now_add=True)
+def getUser(userId=None):
+    if(not(userId)):
+        user=users.get_current_user();
+        if(not(user)):
+            return None
+        userId=user.user_id()
+    userObjects = db.GqlQuery("SELECT * "
+                            "FROM User "
+                            "WHERE userId = :2 AND ANCESTOR IS :1",
+                            vintage_vibe_key(),userId)
+    if(userObjects.count()>0): return userObjects[0]
+    else:
+        userObject=User(parent=vintage_vibe_key())
+        userObject.userId=userId
+        userObject.put()
+        return userObject
 
 
 def vintage_vibe_name():
     return "vintage_vibe"
     
-def vintageVibeKey():
+def vintage_vibe_key():
   """Constructs a Datastore key for a Guestbook entity with guestbook_name."""
   return db.Key.from_path('VintageVibe', vintage_vibe_name())
 
@@ -51,8 +62,10 @@ class Items(webapp2.RequestHandler):
         self.redirect(users.create_login_url(self.request.uri))
         return
   
-    guestbook_name=vintage_vibe_name()
+    db_name=vintage_vibe_name()
 
+    foruser = self.request.get('user', default_value=user.user_id())
+	
     # Ancestor Queries, as shown here, are strongly consistent with the High
     # Replication Datastore. Queries that span entity groups are eventually
     # consistent. If we omitted the ancestor from this query there would be a
@@ -61,7 +74,7 @@ class Items(webapp2.RequestHandler):
     items = db.GqlQuery("SELECT * "
                             "FROM Item "
                             "WHERE ANCESTOR IS :1", #AND userId IS :2
-                            vintageVibeKey()) #, user.user_id()
+                            vintage_vibe_key()) #, user.user_id()
 
                               
     upload_url = blobstore.create_upload_url('/upload')
@@ -69,20 +82,21 @@ class Items(webapp2.RequestHandler):
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
-        Welcome %s. Your items are below."""%user.email())
+        Welcome %s. Your items are below. <p>
+        <a href="%s">logout</a><p>"""%(user.email(),users.create_logout_url(self.request.uri)))
         
     for item in items:
         self.response.out.write(
-            '<b>%s</b> for %f:' % (item.clothingType,item.price))
+            '<b>%s</b> for %f:' % (cgi.escape(item.clothingType),item.price))
         self.response.out.write('<blockquote>%s</blockquote>' %
                               cgi.escape(item.description))
-                              
-    self.response.out.write("""<a href="/additem">Add an item</a>
-    </body></html>""")
+    if foruser==user.user_id():
+        self.response.out.write("""<a href="/additem">Add an item</a>""")
+    self.response.out.write("""</body></html>""")
 
 
 
-class AddItem(webapp2.RequestHandler):
+class AddItem(blobstore_handlers.BlobstoreUploadHandler):
   def get(self):
     user = users.get_current_user()
     if not(user):
@@ -117,14 +131,28 @@ Please upload photos %s:<br>
 </body></html>""" % (upload_url, user.user_id()))
 
   def post(self):
-    user = users.get_current_user()
+    user = getUser()
     if not(user):
         self.redirect(users.create_login_url(self.request.uri))
         return
     upload_url = blobstore.create_upload_url('/additem')
+    
+    #foruser = self.request.get('user', default_value=user.user_id())
+    
+    db_name = vintage_vibe_name()
+    item = Item(parent=user)
+    item.userId=user.userId
+    item.uuid = str(uuid.uuid1())
+    item.clothingType = self.request.get('type', default_value='clothing')
+    item.price = float(self.request.get('price', default_value='1000000'))
+    item.description = self.request.get('description', default_value='')
+    item.put()
     upload_files = self.get_uploads('photos')  # 'file' is file upload field in the form
-    blob_info = upload_files[0]
-    self.redirect('/serve/%s' % blob_info.key())
+    for blob_info in upload_files:
+        photo = Photo(parent=item)
+        photo.photo=blob_info
+    self.redirect('/items')
+    #self.redirect('/photo/%s' % blob_info.key())
 
 
 class User(db.Model):
@@ -142,11 +170,10 @@ class Item(db.Model):
     price = db.FloatProperty()
     
 class Photo(db.Model):
-    itemId= db.StringProperty()
     photoId = db.StringProperty()
     photo = db.BlobProperty()
 
-class ServeHandler(blobstore_handlers.BlobstoreDownloadHandler):
+class PhotoHandler(blobstore_handlers.BlobstoreDownloadHandler):
   def get(self, resource):
     user = users.get_current_user()
     if not(user):
@@ -210,6 +237,6 @@ class ShowLocation(webapp2.RequestHandler):
     
 app = webapp2.WSGIApplication([('/', ShowLocation),
                                ('/additem', AddItem),
-                               ('/serve/([^/]+)?', ServeHandler),
+                               ('/photo/([^/]+)?', PhotoHandler),
                                ('/items', Items)],
                               debug=True)
