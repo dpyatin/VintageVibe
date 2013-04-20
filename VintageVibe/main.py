@@ -211,5 +211,5 @@ class ShowLocation(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([('/', ShowLocation),
                                ('/additem', AddItem),
                                ('/serve/([^/]+)?', ServeHandler),
-                               ('/', SellerPage)],
+                               ('/seller', SellerPage)],
                               debug=True)
