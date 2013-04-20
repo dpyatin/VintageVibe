@@ -23,6 +23,7 @@ import webapp2
 import logging
 import uuid
 
+from google.appengine.api import search
 from google.appengine.ext import db
 from google.appengine.ext import blobstore
 from google.appengine.ext.webapp import blobstore_handlers
@@ -78,7 +79,12 @@ class Items(webapp2.RequestHandler):
 
                               
     upload_url = blobstore.create_upload_url('/upload')
-    self.response.out.write('<html><body>')
+    self.response.out.write('<html>')
+    self.response.out.write("""<head>
+    <script type="text/javascript" language="javascript" src="/javascript/jquery-2.0.0.min.js"></script>
+    <script type="text/javascript" language="javascript" src="/javascript/Main.js">
+    </script></head>""")
+    self.response.out.write('<body>')
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
@@ -162,6 +168,33 @@ Please upload photos %s:<br>
         photo.put()
     self.redirect('/items')
     #self.redirect('/photo/%s' % blob_info.key())
+    
+class UpdateLocation(webapp2.RequestHandler):
+
+  def get(self):
+    logging.debug('Updating Location')
+
+    user = getUser()
+    if not(user):
+        logging.info('No user specified')
+    else:
+        logging.info('user is %s'%user.userId)
+    logging.info('longitude : %s'%self.request.get('long', default_value='long'))
+    logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
+  def post(self):
+    logging.debug('Updating Location')
+
+    user = getUser()
+    if not(user):
+        logging.info('No user specified')
+    else:
+        logging.info('user is %s'%user.userId)
+    user=getUser()
+    user.location="%f,%f"%(float(self.request.get('lat', default_value='0')), float(self.request.get('long', default_value='0')))
+    user.put()
+    logging.info('longitude : %s'%self.request.get('long', default_value='long'))
+    logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
+    
 
 
 class User(db.Model):
@@ -246,5 +279,6 @@ class ShowLocation(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([('/', ShowLocation),
                                ('/additem', AddItem),
                                ('/photo/([^/]+)?', PhotoHandler),
-                               ('/items', Items)],
+                               ('/items', Items),
+                               ('/updatelocation', UpdateLocation)],
                               debug=True)
