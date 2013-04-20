@@ -64,7 +64,7 @@ class Items(webapp2.RequestHandler):
   
     db_name=vintage_vibe_name()
 
-    foruser = self.request.get('user', default_value=user.user_id())
+    foruser = getUser(self.request.get('user', default_value=user.user_id()))
 	
     # Ancestor Queries, as shown here, are strongly consistent with the High
     # Replication Datastore. Queries that span entity groups are eventually
@@ -74,7 +74,7 @@ class Items(webapp2.RequestHandler):
     items = db.GqlQuery("SELECT * "
                             "FROM Item "
                             "WHERE ANCESTOR IS :1", #AND userId IS :2
-                            vintage_vibe_key()) #, user.user_id()
+                            foruser) #, user.user_id()
 
                               
     upload_url = blobstore.create_upload_url('/upload')
@@ -87,10 +87,18 @@ class Items(webapp2.RequestHandler):
         
     for item in items:
         self.response.out.write(
-            '<b>%s</b> for %f:' % (cgi.escape(item.clothingType),item.price))
-        self.response.out.write('<blockquote>%s</blockquote>' %
+            '<b>%s</b> for $%f0.2:' % (cgi.escape(item.clothingType),item.price))
+        self.response.out.write('<blockquote>%s</blockquote><p>' %
                               cgi.escape(item.description))
-    if foruser==user.user_id():
+                              
+        photos = db.GqlQuery("SELECT * "
+                            "FROM Photo "
+                            "WHERE ANCESTOR IS :1", #AND userId IS :2
+                            item) #, user.user_id()
+        for photo in photos:
+            self.response.out.write("""<img src="/photo/%s" alt="Smiley face" height="64" width="64"> """%photo.photo)
+        if photos.count()>0: self.response.out.write("<p>")
+    if foruser.userId==user.user_id():
         self.response.out.write("""<a href="/additem">Add an item</a>""")
     self.response.out.write("""</body></html>""")
 
@@ -111,10 +119,10 @@ class AddItem(blobstore_handlers.BlobstoreUploadHandler):
           <form action="%s" method="post" enctype="multipart/form-data">
 <p>
 Item type:<br>
-<input type="text" name="type" size="30">
+<input type="text" name="type" size="30" value="clothing"/>
 <p>
 Item price:<br>
-<input type="number" name="price" size="30">
+<input type="number" name="price" size="30" value="1000">
 <p>
 Item description:<br>
 <textarea name="description" rows="5" cols="30">
@@ -150,7 +158,8 @@ Please upload photos %s:<br>
     upload_files = self.get_uploads('photos')  # 'file' is file upload field in the form
     for blob_info in upload_files:
         photo = Photo(parent=item)
-        photo.photo=blob_info
+        photo.photo=str(blob_info.key())
+        photo.put()
     self.redirect('/items')
     #self.redirect('/photo/%s' % blob_info.key())
 
@@ -170,8 +179,7 @@ class Item(db.Model):
     price = db.FloatProperty()
     
 class Photo(db.Model):
-    photoId = db.StringProperty()
-    photo = db.BlobProperty()
+    photo = db.StringProperty()
 
 class PhotoHandler(blobstore_handlers.BlobstoreDownloadHandler):
   def get(self, resource):
