@@ -39,19 +39,19 @@ class Greeting(db.Model):
 def vintage_vibe_name():
     return "vintage_vibe"
     
-def vintageVibeKey(guestbook_name=None):
+def vintageVibeKey():
   """Constructs a Datastore key for a Guestbook entity with guestbook_name."""
-  return db.Key.from_path('Guestbook', vintage_vibe_name())
+  return db.Key.from_path('VintageVibe', vintage_vibe_name())
 
 
-class MainPage(webapp2.RequestHandler):
+class SellerPage(webapp2.RequestHandler):
   def get(self):
     user = users.get_current_user()
     if not(user):
         self.redirect(users.create_login_url(self.request.uri))
         return
   
-    guestbook_name=self.request.get('guestbook_name')
+    guestbook_name=vintage_vibe_name()
 
     # Ancestor Queries, as shown here, are strongly consistent with the High
     # Replication Datastore. Queries that span entity groups are eventually
@@ -60,8 +60,8 @@ class MainPage(webapp2.RequestHandler):
     # in a query.
     items = db.GqlQuery("SELECT * "
                             "FROM Item "
-                            "WHERE ANCESTOR IS :1 AND userId IS :2",
-                            guestbook_key(vintage_vibe_name()), user.user_id())
+                            "WHERE ANCESTOR IS :1", #AND userId IS :2
+                            vintageVibeKey()) #, user.user_id()
 
                               
     upload_url = blobstore.create_upload_url('/upload')
@@ -69,7 +69,7 @@ class MainPage(webapp2.RequestHandler):
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
-        Welcome %s. Your items are below.""")
+        Welcome %s. Your items are below."""%user.email())
         
     for item in items:
         self.response.out.write(
@@ -208,9 +208,8 @@ class ShowLocation(webapp2.RequestHandler):
             </script>""")
         self.response.out.write('</body></html>')
     
-app = webapp2.WSGIApplication([('/', MainPage),
+app = webapp2.WSGIApplication([('/', ShowLocation),
                                ('/additem', AddItem),
-                               ('/upload', UploadHandler),
-                               ('/serve/([^/]+)?', ServeHandler)],
-                               ('/showLocation', ShowLocation)],
+                               ('/serve/([^/]+)?', ServeHandler),
+                               ('/', SellerPage)],
                               debug=True)
