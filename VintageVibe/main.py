@@ -44,7 +44,7 @@ def vintageVibeKey():
   return db.Key.from_path('VintageVibe', vintage_vibe_name())
 
 
-class SellerPage(webapp2.RequestHandler):
+class Items(webapp2.RequestHandler):
   def get(self):
     user = users.get_current_user()
     if not(user):
@@ -211,5 +211,5 @@ class ShowLocation(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([('/', ShowLocation),
                                ('/additem', AddItem),
                                ('/serve/([^/]+)?', ServeHandler),
-                               ('/seller', SellerPage)],
+                               ('/items', Items)],
                               debug=True)
