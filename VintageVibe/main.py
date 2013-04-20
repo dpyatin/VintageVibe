@@ -158,33 +158,96 @@ class ServeHandler(blobstore_handlers.BlobstoreDownloadHandler):
 
 class ShowLocation(webapp2.RequestHandler):
     def get(self):
-        self.response.out.write('<html><body>')
+        
+        user = users.get_current_user()
+        allUsers = db.GqlQuery("SELECT * "
+                            "FROM User")
+        #need to display different pin for current user and same style for all the rest
+        #get current location
+        #get locations of other users
+        #make a handler for clicking on a user pin - should redirect to /items?user=...
+        
+        self.response.out.write('<html>')
+        self.response.out.write("""
+            <head>
+            <title>Simple Map</title>
+            <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+            <meta charset="utf-8">
+            <style>
+            html, body, #map-canvas {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            }
+            </style>
+            <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+            <script>
+            var map;
+            var marker;
+            var currentUser=""" + cgi.escape(users.get_current_user().user_id()) + """;
+            var initialize = navigator.geolocation.getCurrentPosition(function(position) {
+            
+                var lng = position.coords.longitude;
+                var ltd = position.coords.latitude;
+                var mapOptions = {
+                    zoom: 8,
+                    center: new google.maps.LatLng(ltd, lng),
+                    mapTypeId: google.maps.MapTypeId.ROADMAP
+                };
+                map = new google.maps.Map(document.getElementById('map-canvas'),mapOptions);
+            
+                placeMarker(new google.maps.LatLng(position.coords.latitude, position.coords.longitude));
+            
+                function placeMarker(location) {
+                    marker = new google.maps.Marker({
+                        position: location,
+                        map: map,
+                        title: 'You'
+                    });
+                }
+            
+                google.maps.event.addListener(marker, 'click', function() {
+                    map.setZoom(20);
+                    map.setCenter(marker.getPosition());
+                });
+            });
+            
+            google.maps.event.addDomListener(window, 'load', initialize);
+            
+            </script>
+            </head>
+        """)
+        self.response.out.write('<body>')
+
         self.response.out.write("""<h1>VintageVibe</h1>""")
-        self.response.out.write("""<p id="demo">Click the button to get your position:</p>
+        self.response.out.write("""<p id="demo">Click the button to get your position on an image:</p>
             <p id="latitude"></p>
             <p id="longitude"></p>
             <button onclick="getLocation()">Try It</button>
+            <p>This is an image...</p>
             <div id="mapholder"></div>
+            <p>This is an interactive map.</p>
+            <div id="map-canvas"></div>
             <script>
             var x=document.getElementById("demo");
             function getLocation()
             {
-            if (navigator.geolocation)
+                if (navigator.geolocation)
             {
-            navigator.geolocation.getCurrentPosition(showPosition,showError);
+                navigator.geolocation.getCurrentPosition(showPosition,showError);
             }
-            else{x.innerHTML="Geolocation is not supported by this browser.";}
+                else{x.innerHTML="Geolocation is not supported by this browser.";}
             }
             
             function showPosition(position)
             {
-            var latlon=position.coords.latitude+","+position.coords.longitude;
-            document.getElementById("latitude").innerHTML=position.coords.latitude;
-            document.getElementById("longitude").innerHTML=position.coords.longitude;
+                var latlon=position.coords.latitude+","+position.coords.longitude;
+                document.getElementById("latitude").innerHTML=position.coords.latitude;
+                document.getElementById("longitude").innerHTML=position.coords.longitude;
             
-            var img_url="http://maps.googleapis.com/maps/api/staticmap?center="
-            +latlon+"&zoom=14&size=400x300&markers="+latlon+"&sensor=false";
-            document.getElementById("mapholder").innerHTML="<img src='"+img_url+"'>";
+                var img_url="http://maps.googleapis.com/maps/api/staticmap?center="
+                +latlon+"&zoom=14&size=400x300&markers="+latlon+"&sensor=false";
+                document.getElementById("mapholder").innerHTML="<img src='"+img_url+"'>";
             }
             
             function showError(error)
