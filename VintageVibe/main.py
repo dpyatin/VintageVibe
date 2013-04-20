@@ -80,7 +80,7 @@ class Items(webapp2.RequestHandler):
                               
     upload_url = blobstore.create_upload_url('/upload')
     self.response.out.write('<html>')
-    self.response.out.write("""<head>
+    self.response.out.write("""<head><meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script type="text/javascript" language="javascript" src="/javascript/jquery-2.0.0.min.js"></script>
     <script type="text/javascript" language="javascript" src="/javascript/Main.js">
     </script></head>""")
@@ -118,7 +118,12 @@ class AddItem(blobstore_handlers.BlobstoreUploadHandler):
         return
   
     upload_url = blobstore.create_upload_url('/additem')
-    self.response.out.write('<html><body>')
+    self.response.out.write("""<head><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="text/javascript" language="javascript" src="/javascript/jquery-2.0.0.min.js"></script>
+    <script type="text/javascript" language="javascript" src="/javascript/Main.js">
+    </script></head>""")
+    
+    self.repsonse.out.write('<body>')
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
@@ -135,14 +140,14 @@ Item description:<br>
 </textarea>
 </p>
 <p>
-Please upload photos %s:<br>
+Add some pictures:<br>
 <input type="file" name="photos" size="40">
 </p>
 <div>
-<input type="submit" value="Send">
+<input type="submit" value="Upload Photos">
 </div>
 </form>
-</body></html>""" % (upload_url, user.user_id()))
+</body></html>""" % (upload_url))
 
   def post(self):
     user = getUser()
@@ -208,6 +213,8 @@ class Item(db.Model):
     uuid = db.StringProperty()
     userId = db.StringProperty()
     clothingType = db.StringProperty()
+    style = db.StringProperty()
+    color = db.StringProperty()
     description = db.StringProperty(multiline=True)
     price = db.FloatProperty()
     
