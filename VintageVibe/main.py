@@ -277,21 +277,22 @@ class ShowLocation(webapp2.RequestHandler):
             </style>
             <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
             <script>
-            var map;
-            var marker;
+            
+            var initialize = navigator.geolocation.getCurrentPosition(function(position) {
             var markers = new Array();
             var currentUser=""" + user.user_id() + """;
             var allUsers = new Array();
             """)
         for index,elem in enumerate(allUsers):
             if elem.location is not None:
-                self.response.out.write("""allUsers["""+str(index)+"""]={"userid":\""""+elem.userId+"""\","location":new google.maps.LatLng("""+"%f,%f"%(elem.location.lat,elem.location.lon)+""")};""")
+                self.response.out.write("""allUsers["""+str(index-1)+"""]={"userid":\""""+elem.userId+"""\","location":new google.maps.LatLng("""+"%f,%f"%(elem.location.lat,elem.location.lon)+""")};""")
             
         self.response.out.write("""
-            var initialize = navigator.geolocation.getCurrentPosition(function(position) {
             
                 var lng = position.coords.longitude;
                 var ltd = position.coords.latitude;
+            var map;
+            var marker;
                 var mapOptions = {
                     zoom: 12,
                     center: new google.maps.LatLng(ltd, lng),
