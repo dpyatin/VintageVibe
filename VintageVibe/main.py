@@ -22,6 +22,7 @@ import urllib
 import webapp2
 import logging
 import uuid
+from random import random
 
 from google.appengine.api import search
 from google.appengine.ext import db
@@ -31,11 +32,13 @@ from google.appengine.api import users
 
 
 def getUser(userId=None):
+    user=users.get_current_user();
     if(not(userId)):
-        user=users.get_current_user();
         if(not(user)):
             return None
         userId=user.user_id()
+    else:
+        user = users.User(_user_id = userId)
     userObjects = db.GqlQuery("SELECT * "
                             "FROM User "
                             "WHERE userId = :2 AND ANCESTOR IS :1",
@@ -44,6 +47,7 @@ def getUser(userId=None):
     else:
         userObject=User(parent=vintage_vibe_key())
         userObject.userId=userId
+        userObject.userEmail=user.email()
         userObject.put()
         return userObject
 
@@ -65,7 +69,9 @@ class Items(webapp2.RequestHandler):
   
     db_name=vintage_vibe_name()
 
-    foruser = getUser(self.request.get('user', default_value=user.user_id()))
+    foruser = getUser(self.request.get('userid', default_value=user.user_id()))
+    
+    logging.info('userid %s'%foruser.userId)
 	
     # Ancestor Queries, as shown here, are strongly consistent with the High
     # Replication Datastore. Queries that span entity groups are eventually
@@ -88,8 +94,8 @@ class Items(webapp2.RequestHandler):
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
-        Welcome %s. Your items are below. <p>
-        <a href="%s">logout</a><p>"""%(user.email(),users.create_logout_url(self.request.uri)))
+        Welcome %s. Items for %s are below. <p>
+        <a href="%s">logout</a><p>"""%(user.email(),foruser.userId,users.create_logout_url(self.request.uri)))
         
     for item in items:
         self.response.out.write(
@@ -123,7 +129,7 @@ class AddItem(blobstore_handlers.BlobstoreUploadHandler):
     <script type="text/javascript" language="javascript" src="/javascript/Main.js">
     </script></head>""")
     
-    self.repsonse.out.write('<body>')
+    self.response.out.write('<body>')
 
     self.response.out.write("""
     <h1>VintageVibe</h1>
@@ -180,25 +186,25 @@ class UpdateLocation(webapp2.RequestHandler):
     logging.debug('Updating Location')
 
     user = getUser()
-    if not(user):
-        logging.info('No user specified')
-    else:
-        logging.info('user is %s'%user.userId)
-    logging.info('longitude : %s'%self.request.get('long', default_value='long'))
-    logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
+    #if not(user):
+    #    logging.info('No user specified')
+    #else:
+    #    logging.info('user is %s'%user.userId)
+    #logging.info('longitude : %s'%self.request.get('long', default_value='long'))
+    #logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
   def post(self):
     logging.debug('Updating Location')
 
     user = getUser()
-    if not(user):
-        logging.info('No user specified')
-    else:
-        logging.info('user is %s'%user.userId)
+    #if not(user):
+    #    logging.info('No user specified')
+    #else:
+    #    logging.info('user is %s'%user.userId)
     user=getUser()
-    user.location="%f,%f"%(float(self.request.get('lat', default_value='0')), float(self.request.get('long', default_value='0')))
+    user.location="%f,%f"%(float(self.request.get('lat', default_value='0'))+random()*0.01, float(self.request.get('long', default_value='0'))+random()*0.01)
     user.put()
-    logging.info('longitude : %s'%self.request.get('long', default_value='long'))
-    logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
+    #logging.info('longitude : %s'%self.request.get('long', default_value='long'))
+    #logging.info('latitude : %s'%self.request.get('lat', default_value='lat'))
     
 
 
@@ -237,8 +243,13 @@ class ShowLocation(webapp2.RequestHandler):
         if not(user):
             self.redirect(users.create_login_url(self.request.uri))
             return
+        
         allUsers = db.GqlQuery("SELECT * "
-                            "FROM User")
+                            "FROM User WHERE ANCESTOR IS :1 ",vintage_vibe_key())
+        #allUsers = db.GqlQuery("SELECT * "
+        #                    "FROM User WHERE User.userId!=:2 AND ANCESTOR IS :1 ",vintage_vibe_key(),user.user_id())
+                            
+        logging.info('Number of users %f'%allUsers.count())
         #need to display different pin for current user and same style for all the rest
         #get current location
         #get locations of other users
@@ -247,7 +258,14 @@ class ShowLocation(webapp2.RequestHandler):
         self.response.out.write('<html>')
         self.response.out.write("""
             <head>
-            <title>Simple Map</title>
+            <title>VintageVibe Map</title>
+            """)
+            
+        
+        self.response.out.write("""<script type="text/javascript" language="javascript" src="/javascript/jquery-2.0.0.min.js"></script>""");
+        self.response.out.write("""<script type="text/javascript" language="javascript" src="/javascript/Main.js"></script>""")
+        
+        self.response.out.write("""
             <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
             <meta charset="utf-8">
             <style>
@@ -267,7 +285,7 @@ class ShowLocation(webapp2.RequestHandler):
             """)
         for index,elem in enumerate(allUsers):
             if elem.location is not None:
-                self.response.out.write("""allUsers["""+str(index)+"""]={"userid":\""""+elem.userId+"""\","location":\""""+elem.location+"""\"};""")
+                self.response.out.write("""allUsers["""+str(index)+"""]={"userid":\""""+elem.userId+"""\","location":new google.maps.LatLng("""+"%f,%f"%(elem.location.lat,elem.location.lon)+""")};""")
             
         self.response.out.write("""
             var initialize = navigator.geolocation.getCurrentPosition(function(position) {
@@ -275,7 +293,7 @@ class ShowLocation(webapp2.RequestHandler):
                 var lng = position.coords.longitude;
                 var ltd = position.coords.latitude;
                 var mapOptions = {
-                    zoom: 8,
+                    zoom: 12,
                     center: new google.maps.LatLng(ltd, lng),
                     mapTypeId: google.maps.MapTypeId.ROADMAP
                 };
@@ -290,29 +308,35 @@ class ShowLocation(webapp2.RequestHandler):
                         title: 'You'
                     });
                 }
-                            
                 for (var i = 0; i < allUsers.length; i++) {
                     markers.push(new google.maps.Marker({
-                                    position: location,
+                                    position: allUsers[i].location,
                                     map: map,
-                                    title: 'You'
+                                    title: 'User'+i,
+                                    icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
                                 })
                         );
                 }
             
                 google.maps.event.addListener(marker, 'click', function() {
-                    map.setZoom(20);
+                    map.setZoom(12);
                     map.setCenter(marker.getPosition());
                     window.location.href="/items?userid="+currentUser
                 });
+                function myClosure(iii){
                 
-                for (var i = 0; i < markers.length; i++) {
-                    google.maps.event.addListener(markers[i], 'click', function() {
-                        map.setZoom(20);
-                        map.setCenter(markers[i].getPosition());
-                        window.location.href="/items?userid="+allUsers[i].userid;
+                    google.maps.event.addListener(markers[iii], 'click', function() {
+                        map.setZoom(12);
+                        map.setCenter(markers[iii].getPosition());
+                        window.location.href="/items?userid="+allUsers[iii].userid
                     });
                 }
+                function setStuff(){
+                for (var ii = 0; ii < markers.length; ii++) {
+                    myClosure(ii);
+                }
+                }
+                setStuff()
             });
             
             google.maps.event.addDomListener(window, 'load', initialize);
@@ -323,13 +347,8 @@ class ShowLocation(webapp2.RequestHandler):
         self.response.out.write('<body>')
 
         self.response.out.write("""<h1>VintageVibe</h1>""")
-        self.response.out.write("""<p id="demo">Click the button to get your position on an image:</p>
-            <p id="latitude"></p>
-            <p id="longitude"></p>
-            <button onclick="getLocation()">Try It</button>
-            <p>This is an image...</p>
-            <div id="mapholder"></div>
-            <p>This is an interactive map.</p>
+        self.response.out.write("""
+            <p>Find users.</p>
             <div id="map-canvas"></div>
             <script>
             var x=document.getElementById("demo");

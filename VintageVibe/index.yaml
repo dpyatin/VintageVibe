@@ -15,3 +15,8 @@ indexes:
   properties:
   - name: date
     direction: desc
+
+- kind: User
+  ancestor: yes
+  properties:
+  - name: User.userId

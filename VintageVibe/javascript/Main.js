@@ -31,5 +31,5 @@ function errorCallback(error) {
         msg += "TIMEOUT";
     msg += ", msg = "+error.message;
 
-    alert(msg);
+    //alert(msg);
 }
